@@ -1,0 +1,123 @@
+Option Explicit
+
+Private m_strResultData As String
+Private m_strInputData  As String
+
+Public Property Get ResultData() As String
+    ResultData = m_strResultData
+End Property
+
+Public Property Let InputData(NewValue As String)
+    m_strInputData = NewValue
+End Property
+
+Public Property Let MultiSelect(NewValue As fmMultiSelect)
+    lstData.MultiSelect = NewValue
+End Property
+
+Private Sub cmdCancel_Click()
+    Me.Hide
+End Sub
+
+Private Sub cmdOK_Click()
+    Dim i As Long, j As Long
+    Dim strTmp As String
+    
+    strTmp = ""
+    For i = 0 To lstData.ListCount - 1
+        If lstData.Selected(i) Then
+            For j = 0 To lstData.ColumnCount - 1
+                strTmp = strTmp & lstData.List(i, j) & ";"
+            Next j
+            If Right(strTmp, 1) = ";" Then strTmp = Left(strTmp, Len(strTmp) - 1)
+            strTmp = strTmp & "|"
+        End If
+    Next i
+    
+    If strTmp <> "" Then If Right(strTmp, 1) = "|" Then strTmp = Left(strTmp, Len(strTmp) - 1)
+    m_strResultData = strTmp
+    Me.Hide
+End Sub
+
+Private Sub UserForm_Activate()
+    m_strResultData = ""
+    
+    If m_strInputData = "" Then
+        Me.Hide
+        Exit Sub
+    End If
+    
+    Dim aryData() As String
+
+    aryData = Split(m_strInputData, "|")
+    
+    lstData.Clear
+    
+    If LBound(aryData) >= 0 Then
+        If UBound(Split(aryData(0), ";")) > 0 Then
+            lstData.ColumnHeads = True
+            lstData.ColumnCount = UBound(Split(aryData(0), ";")) + 1
+        End If
+    End If
+    
+    Dim i As Long, j As Long, aryItem() As String
+    
+    ReDim lngWidth(0 To UBound(Split(aryData(0), ";"))) As Long
+    
+    For i = LBound(aryData) To UBound(aryData)
+        aryItem = Split(aryData(i), ";")
+        lstData.AddItem aryItem(0)
+        lngWidth(0) = Len(aryItem(0)) * lstData.Font.Size
+        For j = 1 To UBound(aryItem)
+            lstData.List(i, j) = aryItem(j)
+            If Len(aryItem(j)) * lstData.Font.Size > lngWidth(j) Then
+                lngWidth(j) = Len(aryItem(j)) * lstData.Font.Size
+            End If
+        Next j
+    Next i
+    
+    Dim strWidths As String
+    For i = LBound(lngWidth) To UBound(lngWidth)
+        strWidths = strWidths & lngWidth(i) & " pt;"
+    Next i
+    lstData.ColumnWidths = strWidths
+    lstData.SetFocus
+End Sub
+
+
+‘-----------------------------
+Private m_dicViews As Scripting.Dictionary
+
+Private Sub Worksheet_Activate()
+    Dim objTracker As clsTrackerHelper
+    Dim strMsg As String
+    
+    Set m_dicViews = New Scripting.Dictionary
+    
+    Set objTracker = New clsTrackerHelper
+    If Not objTracker.GetViewModels(Me.DBTableName, Me.Name, m_dicViews, strMsg, Me.DBConfigSheetName) Then
+        MsgBox strMsg, vbCritical
+        Exit Sub
+    End If
+End Sub
+
+
+Public Function PickWordTemplate(strProcess As String) As String
+    Dim strDocTypeList As String
+    
+    strDocTypeList = modMatrix.GetWordTemplateList(shtBasicConfig.GroupType, strProcess)
+    frmMultiSelect.MultiSelect = fmMultiSelectMulti
+    frmMultiSelect.InputData = strDocTypeList
+    frmMultiSelect.Show
+    If frmMultiSelect.ResultData <> "" Then
+        Dim arySelect() As String
+        arySelect = Split(frmMultiSelect.ResultData, "|")
+        Dim i As Long
+        For i = LBound(arySelect) To UBound(arySelect)
+            arySelect(i) = Split(arySelect(i), ";")(0)
+        Next i
+        PickWordTemplate = Join(arySelect, "|")
+    Else
+        PickWordTemplate = ""
+    End If
+End Function
